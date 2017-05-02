@@ -1,0 +1,8 @@
+Description	
+Read and plot NMR-data: rbnmr.m and plotbnmr.m
+
+These matlab functions makes it easy to read Bruker format processed NMR data into the workspace memory of matlab and to plot the data. It supports one and two-dimensional data.
+
+The matlab function addsampleinfo.m reads the content of an XL-file and adds the sample information to the imported data.
+
+MATLAB release	MATLAB 7.11 (R2010b)
