@@ -18,16 +18,17 @@ switch type
         n1 = size(yT, 1); n2 = 1; n3 = 1; n4 = 1;   % Dimensions of the data array
         X = [real(yT) -imag(yT)]';
         X = X(:);
+        t = [0:dt:(n1-1)*dt];
         % Write the file
-        fileID = fopen(fullfile(dirname{ii}, 'data.1d'), 'w');
+        fileID = fopen(fullfile(dirname, 'data.1d'), 'w');
         fwrite(fileID, [1347571539 1145132097 1446063665 504 n1 n2 n3 n4], 'int');
         fwrite(fileID, t, 'single');
         fwrite(fileID, X, 'single');
         fclose(fileID);
         % Write the parameter file
-        fileID = fopen(fullfile(dirname{ii}, 'acqu.par'), 'w');
+        fileID = fopen(fullfile(dirname, 'acqu.par'), 'w');
         fprintf(fileID, 'Solvent                   = ""\n');
-        fprintf(fileID, ['Sample                    = "sim_', num2str(experiment), '"\n']);
+        fprintf(fileID, ['Sample                    = ""\n']);
         % fprintf(fileID, ['startTime                 = "',
         % datetime('now','TimeZone','local','Format','d-MMM-y_HH:mm:ss Z'),
         % '"\n']);
