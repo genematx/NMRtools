@@ -30,25 +30,24 @@ tau = 0; theta = 0;
 
 switch type
     case 'Bruker2D'
-        readin = readxw(dirname);       % Read the signals
-        yT = double(readin.acqs.data);
-        t = readin.acqs.axes.time1';
-        dt = t(2) - t(1);   % Sampling period (dwell time)
-        nt = size(yT, 1);
+        acqus = read_acqus_new(dirname); % read acquistion parameters
+        TD2 = read_TD2(dirname); % read the size of the second dimension TD2
         
-        % reference frequency w_0
-        c0 = readin.prcs.pars.procs.sf; %Hz->ppm
-        swh = readin.acqs.pars.acqu.sw_h; % sweep width(Hz)
-        O1 = readin.acqs.pars.acqu.o1; %Hz
-        proc_offset = readin.prcs.pars.procs.offset; %ppm
-        SR = swh/2+O1-c0*proc_offset; %Hz
-        f0 = O1-SR; %Hz
+        acqus.TD(2) = TD2;
         
-        % Phasing
-        ph0 = readin.prcs.pars.proc.phc0; % degree
-        theta = -ph0*2*pi/360;
-        ph1 = readin.prcs.pars.proc.phc1;     % dead time
-        tau = -ph1/360/swh; % from ph1 (real)
+        ntgrp = ceil(acqus.GRPDLY);    % Number of time samples of the Bruker filter response;
+        SWH = acqus.SW_h;     % Spectral width in Hz
+        f0 = acqus.O1;        % Offset in Hz
+        c0 = acqus.SFO1;    % Frequency of the local oscillator in MHz
+        dt = 1 / SWH;         % Sampling period (dwell time) 
+        tau = acqus.DE * (1e-06);   % Ringdown time delay in sec
+        
+        yT = read_ser_file(dirname, acqus.bytorda,acqus.TD);
+
+        yT = yT(ntgrp+1:end,:);
+        nt = size(yT,1);
+        t = [0:dt:(nt-1)*dt]';      % Time in seconds   
+        
     case 'BrukerFID'            % Reads Bruker FID data
         acqus = read_acqus_new(dirname);
         ntgrp = ceil(acqus.GRPDLY);    % Number of time samples of the Bruker filter response;
@@ -123,6 +122,7 @@ switch type
         dt = 1 / sw;         % Sampling period (dwell time)
         t = [0:dt:(nt-1)*dt]';      % Time array in seconds
         tau = DE * (1e-06);   % Ringdown time delay in sec
+        
     case 'SpinsolveShimming'
         fileID = fopen(fullfile(dirname, 'spectrum.1d'));
         head = fread(fileID, 8, 'int');   % Read the header
@@ -302,4 +302,54 @@ fclose(fid);
 A = double(A);
 B = reshape(A,[2,size(A,1)/2]); % Each recorded complex value is saved by real part followed by imaginary part -> A looks like [r1,i1,r2,i2,r3,i3,r4,i4,.....]
 fid_data = transpose(complex(B(1,:),B(2,:)));
+end
+
+function ser_data = read_ser_file(loc_data,bytorda,TD)
+%% Read the FID of 2D data
+
+if bytorda == 0
+    datatyp = 'l';
+elseif bytorda == 1
+    datatyp = 'b';
+end 
+file_name = strcat(loc_data,'/ser');
+ser = fopen(file_name,'r',datatyp);
+%[A,count] = fread(ser,inf,'int=>int');
+A=fread(ser,'int32');
+fclose(ser);
+
+A = double(A);
+B = reshape(A,[2,size(A,1)/2]); % Each recorded complex value is saved by real part followed by imaginary part -> A looks like [r1,i1,r2,i2,r3,i3,r4,i4,.....]
+C = complex(B(1,:),B(2,:));
+
+N = [TD(1)/2 TD(2)];
+
+C = C(1:(N(1)*N(2))); % rest of C consists of zeros
+ser_data = reshape(C,N);
+
+end
+
+
+function TD2 = read_TD2(dirname)
+
+%% Get TD2
+file_name = strcat(dirname,'/acqu2s');
+fid_acqus2 = fopen(file_name);
+
+
+% read in line after line
+% Search for NBL
+tline = fgetl(fid_acqus2);
+key = '##$TD=';
+end_read = min(length(key),length(tline));
+str_found = strcmp(tline(1:end_read),key);
+while ~str_found
+    % Read the next line
+    tline = fgetl(fid_acqus2);
+    end_read = min(length(key),length(tline));
+    str_found = strcmp(tline(1:end_read),key);
+end    
+TD2 = str2double(tline(length(key)+1:end));
+
+fclose(fid_acqus2);
 end
