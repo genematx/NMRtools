@@ -30,6 +30,28 @@ tau = 0; theta = 0;
 
 switch type
     case 'Bruker2D'
+%     readin = readxw(dirname);       % Read the signals
+%     y = readin.acqs.data;    % Read ns scans      % % or % y = readin.acqs.data(:,ini_ns) / 128;       % Read a single scan
+%     t = readin.acqs.axes.time1'; % double the dw
+%     % truncate the first 1000 points
+%     y = double(y(1001:end));
+%     t = double(t(1001:end));
+%     dt = mean(t(2:end) - t(1:end-1));   % 25e-06;         % Sampling period (dwell time)
+%     
+%     % reference frequency w_0
+%     c0 = readin.prcs.pars.procs.sf; %Hz->ppm
+%     swh = readin.acqs.pars.acqu.sw_h; % sweep width(Hz)
+%     O1 = readin.acqs.pars.acqu.o1; %Hz
+%     proc_offset = readin.prcs.pars.procs.offset; %ppm
+%     SR = swh/2+O1-c0*proc_offset; %Hz
+%     f0 = O1-SR; %Hz
+%     % global phase shift theta_0
+%     ph0 = readin.prcs.pars.proc.phc0; % degree
+%     theta = -ph0*2*pi/360 + [cmp.thet];
+%     ph1 = readin.prcs.pars.proc.phc1;     % dead time
+%     tau = -ph1/360/swh; % from ph1 (real)
+       
+        
         acqus = read_acqus_new(dirname); % read acquistion parameters
         TD2 = read_TD2(dirname); % read the size of the second dimension TD2
         acqus.TD(2) = TD2;
@@ -318,7 +340,10 @@ A=fread(ser,'int32');
 fclose(ser);
 
 A = A(1:2:end) + 1i*A(2:2:end); % Each recorded complex value is saved by real part followed by imaginary part -> A looks like [r1,i1,r2,i2,r3,i3,r4,i4,.....]
-ser_data = reshape(A, [], TD(2));
+N = [TD(1)/2 TD(2)];
+
+A = A(1:(N(1)*N(2)));     % rest of A consists of zeros
+ser_data = reshape(A,TD(1)/2, TD(2));
 
 end
 
