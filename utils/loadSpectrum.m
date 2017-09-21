@@ -3,9 +3,13 @@ function [yF, ppm_scale] = loadSpectrum(type, dirname)
 %
 % Inputs:
 % type - a string that specifies the type of the data to be read
-%        Bruker2D - for pseudo 2D experiments
-%        BrukerFID - for 1D Bruker data in the form of FID
-%        BrukerSpectrum - for processed Bruker data; will take IFT
+%        Bruker2DFID - for pseudo 2D experiments => FT in
+%                    matlab
+%        Bruker2DSpectrum - for pseudo 2D experiments => FT in
+%                    TopSpin 
+%        BrukerFID - for 1D Bruker read data in the form of FID => FT in
+%                    matlab
+%        BrukerSpectrum - for processed Bruker data => FT in TopSpin
 %        Spinsolve - for usual Spinsolve 1D data
 % dirname - the root directory where the data resides
 %
@@ -18,11 +22,12 @@ function [yF, ppm_scale] = loadSpectrum(type, dirname)
 
 
 switch type
-    case 'Bruker2D'
+    case 'Bruker2DFID' % Bruker2D_FID  missing Bruker2D_spectrum (needs rbnmr_2ii)
         acqus = read_acqus_new(dirname); % read acquistion parameters
         TD2 = read_TD2(dirname); % read the size of the second dimension TD2
+        procs = readnmrpar(strcat(dirname,'/pdata/1/procs'));
         
-        acqus.TD(2) = TD2;
+        acqus.TD(2) = TD2;       
         
         ntgrp = ceil(acqus.GRPDLY);    % Number of time samples of the Bruker filter response;
         SWH = acqus.SW_h;     % Spectral width in Hz
@@ -37,20 +42,28 @@ switch type
         nt = size(yT,1);
         t = [0:dt:(nt-1)*dt]';      % Time in seconds   
         
-        NFFT = 2^(nextpow2(nt));
-        yF = fftshift(fft(yT,NFFT,1)/nt);
+        NFFT = procs.SI;
+        yF = fftshift(fft(yT,NFFT,1));
         freq = 1/(dt)*linspace(-1,1,NFFT);  
         
-        procs = readnmrpar(strcat(dirname,'/pdata/1/procs'));
+        
         
         % Calculate x-axis
         ppm_scale = linspace( procs.OFFSET,...
                     procs.OFFSET-procs.SW_p./procs.SF,...
                     NFFT)';
-        
+                
+       yF = yF.';                
+
+    case 'Bruker2DSpectrum' % Bruker2D_FID  missing Bruker2D_spectrum (needs rbnmr_2ii)    
+        allData = rbnmr(dirname);     % Reads processed Bruker data
+        yF = complex(allData.Data, allData.IData);
+        ppm_scale = allData.XAxis.';        
         
     case 'BrukerFID'            % Reads Bruker FID data
         acqus = read_acqus_new(dirname);
+        procs = readnmrpar(strcat(dirname,'/pdata/1/procs'));
+        
         ntgrp = ceil(acqus.GRPDLY);    % Number of time samples of the Bruker filter response;
         SWH = acqus.SW_h;     % Spectral width in Hz
         f0 = acqus.O1;        % Offset in Hz
@@ -63,10 +76,17 @@ switch type
         nt = numel(yT);
         t = [0:dt:(nt-1)*dt]';      % Time in seconds        
         
-        NFFT = 2^(nextpow2(nt));
-        yF = fftshift(fft(yT,NFFT)/nt);
-        freq = 1/(dt)*linspace(-1,1,NFFT);  
         
+        
+        NFFT = procs.SI;
+        yF = fftshift(fft(yT,NFFT));
+        yF = yF(end:-1:1);
+        
+        
+        freq = 1/(dt)*linspace(-1,1,NFFT);  
+%         yF = yF(:).*exp(-1i*2*pi*acqus.GRPDLY*freq(:)*dt);
+        
+       
         procs = readnmrpar(strcat(dirname,'/pdata/1/procs'));       
         
         % Calculate x-axis
@@ -207,11 +227,38 @@ A = double(A);
 B = reshape(A,[2,size(A,1)/2]); % Each recorded complex value is saved by real part followed by imaginary part -> A looks like [r1,i1,r2,i2,r3,i3,r4,i4,.....]
 C = complex(B(1,:),B(2,:));
 
-N = [TD(1)/2 TD(2)];
+% N = [TD(1)/2 TD(2)];
+N = [length(C)/TD(2) TD(2)];
+
 
 C = C(1:(N(1)*N(2))); % rest of C consists of zeros
 ser_data = reshape(C,N);
 
+end
+
+
+function SI = read_procs(dirname)
+
+%% Get TD2
+file_name = strcat(dirname,'/procs');
+fid_procs = fopen(file_name);
+
+
+% read in line after line
+% Search for NBL
+tline = fgetl(fid_procs);
+key = '##$SI=';
+end_read = min(length(key),length(tline));
+str_found = strcmp(tline(1:end_read),key);
+while ~str_found
+    % Read the next line
+    tline = fgetl(fid_procs);
+    end_read = min(length(key),length(tline));
+    str_found = strcmp(tline(1:end_read),key);
+end    
+SI = str2double(tline(length(key)+1:end));
+
+fclose(fid_procs);
 end
 
 
